@@ -9,13 +9,35 @@ interface PreferencesVariantsEditorProps {
   preferences: ChannelPreferences | undefined;
   onChange: (preferences: ChannelPreferences) => void;
   onValidationChange?: (isValid: boolean) => void;
+  // Кастомные тексты для адаптации под разные типы каналов
+  labels?: {
+    title?: string;
+    description?: string;
+    modeLabel?: string;
+    variantsLabel?: string;
+    addButton?: string;
+    placeholder?: string;
+    helpText?: string;
+  };
 }
 
 const PreferencesVariantsEditor = ({
   preferences,
   onChange,
-  onValidationChange
+  onValidationChange,
+  labels
 }: PreferencesVariantsEditorProps) => {
+  const defaultLabels = {
+    title: "Логика генерации сценариев",
+    description: "Настройте режим выбора и варианты дополнительных пожеланий",
+    modeLabel: "Режим выбора варианта пожеланий",
+    variantsLabel: "Варианты дополнительных пожеланий",
+    addButton: "Добавить вариант пожеланий",
+    placeholder: "Любые дополнительные требования к сценариям... Например: «бабушка и дедушка — казахи», особенности персонажей, сеттинг, стиль съёмки.",
+    helpText: "Создайте несколько вариантов пожеланий для увеличения разнообразия контента. Система будет использовать их согласно выбранному режиму."
+  };
+  
+  const finalLabels = { ...defaultLabels, ...labels };
   const [expandedVariants, setExpandedVariants] = useState<Set<string>>(new Set());
   const [collapsedVariants, setCollapsedVariants] = useState<Set<string>>(new Set());
   const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
@@ -171,7 +193,7 @@ const PreferencesVariantsEditor = ({
       {/* Режим выбора варианта */}
       <div className="space-y-2">
         <label className="flex items-center gap-2 text-sm font-medium text-slate-200">
-          <span>Режим выбора варианта пожеланий</span>
+          <span>{finalLabels.modeLabel}</span>
           <FieldHelpIcon
             fieldKey="channel.preferences.mode"
             page="channelEdit"
@@ -205,7 +227,7 @@ const PreferencesVariantsEditor = ({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="block text-sm font-semibold text-slate-200">
-            Варианты дополнительных пожеланий
+            {finalLabels.variantsLabel}
           </label>
           <button
             type="button"
@@ -213,7 +235,7 @@ const PreferencesVariantsEditor = ({
             className="flex items-center gap-2 rounded-xl border border-brand/30 bg-brand/10 px-4 py-2.5 text-sm font-medium text-brand transition-all duration-200 hover:border-brand/50 hover:bg-brand/20 hover:shadow-md hover:shadow-brand/20"
           >
             <Plus size={18} />
-            Добавить вариант пожеланий
+            {finalLabels.addButton}
           </button>
         </div>
 
@@ -335,7 +357,7 @@ const PreferencesVariantsEditor = ({
                       }}
                       rows={6}
                       className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none transition-all duration-200 placeholder:text-slate-500 focus:border-brand focus:ring-2 focus:ring-brand/40 hover:border-white/20 min-h-[140px] h-auto resize-y overflow-auto text-sm leading-relaxed font-mono"
-                      placeholder="Любые дополнительные требования к сценариям... Например: «бабушка и дедушка — казахи», особенности персонажей, сеттинг, стиль съёмки."
+                      placeholder={finalLabels.placeholder}
                     />
                   </div>
                 )
@@ -347,8 +369,7 @@ const PreferencesVariantsEditor = ({
 
       {/* Подсказка */}
       <p className="text-xs text-slate-400">
-        Создайте несколько вариантов пожеланий для увеличения разнообразия контента. 
-        Система будет использовать их согласно выбранному режиму.
+        {finalLabels.helpText}
       </p>
 
       {/* Модальное окно для редактирования варианта */}

@@ -56,6 +56,9 @@ export interface MusicClipsSettings {
     instagram?: boolean;
   };
   language?: string; // Опциональный язык
+  // Варианты промптов для разнообразия (аналогично ChannelPreferences для shorts)
+  promptVariants?: ChannelPreferences; // Используем ту же структуру, что и для shorts
+  generationMode?: GenerationMode; // Режим генерации для music_clips (аналогично shorts)
 }
 
 export interface Channel {

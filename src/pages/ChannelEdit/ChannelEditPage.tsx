@@ -14,6 +14,8 @@ import type {
   MusicClipsSettings
 } from "../../domain/channel";
 import PreferencesVariantsEditor from "../../components/PreferencesVariantsEditor";
+import MusicClipsPreferencesVariantsEditor from "../../components/MusicClipsPreferencesVariantsEditor";
+import ChannelBaseSettingsMusicClips from "../../components/ChannelBaseSettingsMusicClips";
 import { validatePreferences } from "../../utils/preferencesUtils";
 import { testBlottata } from "../../api/blottata";
 import { getTelegramStatus } from "../../api/telegramIntegration";
@@ -125,7 +127,30 @@ const ChannelEditPage = () => {
         await fetchChannels(user.uid);
         const found = channels.find((c) => c.id === channelId);
         if (found) {
-          setChannel(found);
+          // Инициализируем musicClipsSettings если канал типа music_clips и settings отсутствуют
+          if (found.type === "music_clips" && !found.musicClipsSettings) {
+            setChannel({
+              ...found,
+              musicClipsSettings: {
+                targetDurationSec: 60,
+                clipSec: 10,
+                segmentDelayMs: 30000,
+                maxParallelSegments: 1,
+                maxRetries: 3,
+                retryDelayMs: 60000,
+                sunoPrompt: "",
+                styleTags: [],
+                platforms: {
+                  youtube: true,
+                  tiktok: false,
+                  instagram: false
+                },
+                language: found.language || "ru"
+              }
+            });
+          } else {
+            setChannel(found);
+          }
         } else {
           const errorMsg = "Канал не найден";
           setError(errorMsg);
@@ -401,13 +426,33 @@ const ChannelEditPage = () => {
       return;
     }
 
-    // Валидация preferences
-    const preferencesValidation = validatePreferences(channel.preferences);
-    if (!preferencesValidation.valid) {
-      const errorMsg = preferencesValidation.error || "Проверьте настройки пожеланий";
-      setError(errorMsg);
-      showError(errorMsg, 6000);
-      return;
+    // Валидация preferences (для shorts) или promptVariants (для music_clips)
+    if ((channel.type || "shorts") === "shorts") {
+      const preferencesValidation = validatePreferences(channel.preferences);
+      if (!preferencesValidation.valid) {
+        const errorMsg = preferencesValidation.error || "Проверьте настройки пожеланий";
+        setError(errorMsg);
+        showError(errorMsg, 6000);
+        return;
+      }
+    } else if (channel.type === "music_clips") {
+      // Валидация musicClipsSettings
+      if (!channel.musicClipsSettings?.sunoPrompt || channel.musicClipsSettings.sunoPrompt.trim() === "") {
+        const errorMsg = "Промпт для Suno обязателен для Music Clips каналов";
+        setError(errorMsg);
+        showError(errorMsg, 6000);
+        return;
+      }
+      // Валидация promptVariants если они есть
+      if (channel.musicClipsSettings.promptVariants) {
+        const preferencesValidation = validatePreferences(channel.musicClipsSettings.promptVariants);
+        if (!preferencesValidation.valid) {
+          const errorMsg = preferencesValidation.error || "Проверьте настройки вариантов промптов";
+          setError(errorMsg);
+          showError(errorMsg, 6000);
+          return;
+        }
+      }
     }
 
     // Валидация расписания автоотправки
@@ -768,27 +813,28 @@ const ChannelEditPage = () => {
             </div>
 
             {/* Основные настройки канала - сворачиваемый блок */}
-            <Accordion
-              title="Основные настройки канала"
-              defaultOpen={!channelId} // Развёрнуто при создании, свёрнуто при редактировании
-              summary={(() => {
-                if (!channel) return "";
-                const parts: string[] = [];
-                const platformLabel = PLATFORMS.find(p => p.value === channel.platform)?.label;
-                const languageLabel = LANGUAGES.find(l => l.value === channel.language)?.label;
-                if (platformLabel) parts.push(platformLabel);
-                if (languageLabel) parts.push(languageLabel);
-                if (channel.tone) parts.push(channel.tone);
-                if (channel.audience) {
-                  // Берём первые слова из описания аудитории
-                  const audiencePreview = channel.audience.split(/\s+/).slice(0, 3).join(" ");
-                  if (audiencePreview) parts.push(audiencePreview);
-                }
-                return parts.join(" • ") || "Настройки не заполнены";
-              })()}
-              className="border-0 bg-transparent"
-            >
-              <div className="space-y-6 pt-2">
+            {(channel.type || "shorts") === "shorts" ? (
+              <Accordion
+                title="Основные настройки канала"
+                defaultOpen={!channelId} // Развёрнуто при создании, свёрнуто при редактировании
+                summary={(() => {
+                  if (!channel) return "";
+                  const parts: string[] = [];
+                  const platformLabel = PLATFORMS.find(p => p.value === channel.platform)?.label;
+                  const languageLabel = LANGUAGES.find(l => l.value === channel.language)?.label;
+                  if (platformLabel) parts.push(platformLabel);
+                  if (languageLabel) parts.push(languageLabel);
+                  if (channel.tone) parts.push(channel.tone);
+                  if (channel.audience) {
+                    // Берём первые слова из описания аудитории
+                    const audiencePreview = channel.audience.split(/\s+/).slice(0, 3).join(" ");
+                    if (audiencePreview) parts.push(audiencePreview);
+                  }
+                  return parts.join(" • ") || "Настройки не заполнены";
+                })()}
+                className="border-0 bg-transparent"
+              >
+                <div className="space-y-6 pt-2">
                 {/* Название канала - на всю ширину */}
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-slate-200">
@@ -1053,36 +1099,72 @@ const ChannelEditPage = () => {
               </div>
             </Accordion>
 
-            {/* Блок логики генерации сценариев */}
+            {/* Блок логики генерации сценариев / промптов */}
             <div className="border-t border-white/10 pt-6">
               <div className="mb-4 flex items-center gap-2">
                 <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                  Логика генерации сценариев
+                  {(channel.type || "shorts") === "shorts" 
+                    ? "Логика генерации сценариев"
+                    : "Логика генерации промптов"}
                 </h3>
                 <FieldHelpIcon
-                  fieldKey="channel.preferences"
+                  fieldKey={(channel.type || "shorts") === "shorts" ? "channel.preferences" : "musicClipsSettings.promptVariants"}
                   page="channelEdit"
                   channelContext={{
                     name: channel.name,
                     platform: channel.platform,
                     language: channel.language,
-                    preferences: channel.preferences
+                    preferences: (channel.type || "shorts") === "shorts" 
+                      ? channel.preferences 
+                      : channel.musicClipsSettings?.promptVariants,
+                    type: channel.type
                   }}
-                  currentValue={channel.preferences}
-                  label="Дополнительные пожелания"
+                  currentValue={(channel.type || "shorts") === "shorts" 
+                    ? channel.preferences 
+                    : channel.musicClipsSettings?.promptVariants}
+                  label={(channel.type || "shorts") === "shorts" 
+                    ? "Дополнительные пожелания"
+                    : "Варианты промптов"}
                 />
               </div>
               <p className="mb-4 text-xs text-slate-500">
-                Настройте режим выбора и варианты дополнительных пожеланий
+                {(channel.type || "shorts") === "shorts"
+                  ? "Настройте режим выбора и варианты дополнительных пожеланий"
+                  : "Настройте режим выбора и варианты дополнительных пожеланий для музыки и клипа"}
               </p>
               <div className="space-y-2">
-                <PreferencesVariantsEditor
-                  preferences={channel.preferences}
-                  onChange={(preferences: ChannelPreferences) => {
-                    setChannel({ ...channel, preferences });
-                  }}
-                  onValidationChange={setPreferencesValid}
-                />
+                {(channel.type || "shorts") === "shorts" ? (
+                  <PreferencesVariantsEditor
+                    preferences={channel.preferences}
+                    onChange={(preferences: ChannelPreferences) => {
+                      setChannel({ ...channel, preferences });
+                    }}
+                    onValidationChange={setPreferencesValid}
+                  />
+                ) : (
+                  <MusicClipsPreferencesVariantsEditor
+                    preferences={channel.musicClipsSettings?.promptVariants}
+                    onChange={(preferences: ChannelPreferences) => {
+                      setChannel({
+                        ...channel,
+                        musicClipsSettings: {
+                          ...(channel.musicClipsSettings || {
+                            targetDurationSec: 60,
+                            clipSec: 10,
+                            segmentDelayMs: 30000,
+                            maxParallelSegments: 1,
+                            maxRetries: 3,
+                            retryDelayMs: 60000,
+                            sunoPrompt: "",
+                            platforms: { youtube: true }
+                          }),
+                          promptVariants: preferences
+                        }
+                      });
+                    }}
+                    onValidationChange={setPreferencesValid}
+                  />
+                )}
               </div>
             </div>
 
@@ -1092,76 +1174,181 @@ const ChannelEditPage = () => {
                 <label className="flex items-center gap-2 text-sm font-semibold text-slate-200">
                   <span>Режим генерации *</span>
                   <FieldHelpIcon
-                    fieldKey="channel.generationMode"
+                    fieldKey={(channel.type || "shorts") === "shorts" ? "channel.generationMode" : "musicClipsSettings.generationMode"}
                     page="channelEdit"
                     channelContext={{
                       name: channel.name,
                       platform: channel.platform,
                       language: channel.language,
-                      generationMode: channel.generationMode
+                      generationMode: (channel.type || "shorts") === "shorts" 
+                        ? channel.generationMode 
+                        : channel.musicClipsSettings?.generationMode,
+                      type: channel.type
                     }}
-                    currentValue={channel.generationMode}
+                    currentValue={(channel.type || "shorts") === "shorts" 
+                      ? channel.generationMode 
+                      : channel.musicClipsSettings?.generationMode}
                     label="Режим генерации"
                   />
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setChannel({
-                        ...channel,
-                        generationMode: "script"
-                      })
-                    }
-                    className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
-                      (channel.generationMode || "script") === "script"
-                        ? "border-brand bg-brand/10 text-white shadow-md shadow-brand/20"
-                        : "border-white/10 bg-slate-950/60 text-slate-300 hover:border-brand/40 hover:bg-slate-900/80"
-                    }`}
-                  >
-                    <div className="font-semibold">Сценарий</div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      Только подробный сценарий
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setChannel({
-                        ...channel,
-                        generationMode: "prompt"
-                      })
-                    }
-                    className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
-                      channel.generationMode === "prompt"
-                        ? "border-brand bg-brand/10 text-white shadow-md shadow-brand/20"
-                        : "border-white/10 bg-slate-950/60 text-slate-300 hover:border-brand/40 hover:bg-slate-900/80"
-                    }`}
-                  >
-                    <div className="font-semibold">Сценарий + промпт для видео</div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      Сценарий + VIDEO_PROMPT для Sora/Veo
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setChannel({
-                        ...channel,
-                        generationMode: "video-prompt-only"
-                      })
-                    }
-                    className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
-                      channel.generationMode === "video-prompt-only"
-                        ? "border-brand bg-brand/10 text-white shadow-md shadow-brand/20"
-                        : "border-white/10 bg-slate-950/60 text-slate-300 hover:border-brand/40 hover:bg-slate-900/80"
-                    }`}
-                  >
-                    <div className="font-semibold">Промпт для видео</div>
-                    <div className="mt-1 text-xs text-slate-400">
-                      Только VIDEO_PROMPT для Sora/Veo без текста сценария
-                    </div>
-                  </button>
+                  {(channel.type || "shorts") === "shorts" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setChannel({
+                            ...channel,
+                            generationMode: "script"
+                          })
+                        }
+                        className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
+                          (channel.generationMode || "script") === "script"
+                            ? "border-brand bg-brand/10 text-white shadow-md shadow-brand/20"
+                            : "border-white/10 bg-slate-950/60 text-slate-300 hover:border-brand/40 hover:bg-slate-900/80"
+                        }`}
+                      >
+                        <div className="font-semibold">Сценарий</div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Только подробный сценарий
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setChannel({
+                            ...channel,
+                            generationMode: "prompt"
+                          })
+                        }
+                        className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
+                          channel.generationMode === "prompt"
+                            ? "border-brand bg-brand/10 text-white shadow-md shadow-brand/20"
+                            : "border-white/10 bg-slate-950/60 text-slate-300 hover:border-brand/40 hover:bg-slate-900/80"
+                        }`}
+                      >
+                        <div className="font-semibold">Сценарий + промпт для видео</div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Сценарий + VIDEO_PROMPT для Sora/Veo
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setChannel({
+                            ...channel,
+                            generationMode: "video-prompt-only"
+                          })
+                        }
+                        className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
+                          channel.generationMode === "video-prompt-only"
+                            ? "border-brand bg-brand/10 text-white shadow-md shadow-brand/20"
+                            : "border-white/10 bg-slate-950/60 text-slate-300 hover:border-brand/40 hover:bg-slate-900/80"
+                        }`}
+                      >
+                        <div className="font-semibold">Промпт для видео</div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Только VIDEO_PROMPT для Sora/Veo без текста сценария
+                        </div>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setChannel({
+                            ...channel,
+                            musicClipsSettings: {
+                              ...(channel.musicClipsSettings || {
+                                targetDurationSec: 60,
+                                clipSec: 10,
+                                segmentDelayMs: 30000,
+                                maxParallelSegments: 1,
+                                maxRetries: 3,
+                                retryDelayMs: 60000,
+                                sunoPrompt: "",
+                                platforms: { youtube: true }
+                              }),
+                              generationMode: "script"
+                            }
+                          })
+                        }
+                        className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
+                          (channel.musicClipsSettings?.generationMode || "script") === "script"
+                            ? "border-brand bg-brand/10 text-white shadow-md shadow-brand/20"
+                            : "border-white/10 bg-slate-950/60 text-slate-300 hover:border-brand/40 hover:bg-slate-900/80"
+                        }`}
+                      >
+                        <div className="font-semibold">Только промпт трека</div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Генерируется только музыка через Suno
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setChannel({
+                            ...channel,
+                            musicClipsSettings: {
+                              ...(channel.musicClipsSettings || {
+                                targetDurationSec: 60,
+                                clipSec: 10,
+                                segmentDelayMs: 30000,
+                                maxParallelSegments: 1,
+                                maxRetries: 3,
+                                retryDelayMs: 60000,
+                                sunoPrompt: "",
+                                platforms: { youtube: true }
+                              }),
+                              generationMode: "prompt"
+                            }
+                          })
+                        }
+                        className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
+                          channel.musicClipsSettings?.generationMode === "prompt"
+                            ? "border-brand bg-brand/10 text-white shadow-md shadow-brand/20"
+                            : "border-white/10 bg-slate-950/60 text-slate-300 hover:border-brand/40 hover:bg-slate-900/80"
+                        }`}
+                      >
+                        <div className="font-semibold">Промпт трека + промпт клипа</div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Генерируется музыка и видео-сегменты (видео)
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setChannel({
+                            ...channel,
+                            musicClipsSettings: {
+                              ...(channel.musicClipsSettings || {
+                                targetDurationSec: 60,
+                                clipSec: 10,
+                                segmentDelayMs: 30000,
+                                maxParallelSegments: 1,
+                                maxRetries: 3,
+                                retryDelayMs: 60000,
+                                sunoPrompt: "",
+                                platforms: { youtube: true }
+                              }),
+                              generationMode: "video-prompt-only"
+                            }
+                          })
+                        }
+                        className={`rounded-xl border px-4 py-3 text-left transition-all duration-200 ${
+                          channel.musicClipsSettings?.generationMode === "video-prompt-only"
+                            ? "border-brand bg-brand/10 text-white shadow-md shadow-brand/20"
+                            : "border-white/10 bg-slate-950/60 text-slate-300 hover:border-brand/40 hover:bg-slate-900/80"
+                        }`}
+                      >
+                        <div className="font-semibold">Только промпт клипа</div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Генерируются только видео-сегменты, без текста трека
+                        </div>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
