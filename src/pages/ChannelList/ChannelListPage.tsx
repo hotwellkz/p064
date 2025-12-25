@@ -604,32 +604,32 @@ const ChannelListPage = () => {
         {/* Десктопная версия заголовка */}
         <header className="hidden flex-col gap-3 rounded-2xl channels-premium-header p-4 md:flex lg:p-5">
           {/* Основной контейнер: заголовок слева, кнопки справа */}
-          <div className="flex items-start justify-between gap-4 lg:gap-6">
-            {/* Левая часть: заголовок и описание (ограничиваем ширину) */}
-            <div className="flex-1 min-w-0 max-w-[45%]">
+          <div className="flex items-start justify-between gap-4 lg:gap-6 flex-wrap lg:flex-nowrap">
+            {/* Левая часть: заголовок и описание - фиксированная минимальная ширина, не сжимается */}
+            <div className="flex-1 min-w-[240px] lg:min-w-[280px] lg:max-w-[50%]">
               <div className="flex items-baseline gap-2 flex-wrap mb-1">
-                <p className="text-[10px] uppercase tracking-[0.15em] text-slate-500 font-medium">
+                <p className="text-[10px] uppercase tracking-[0.15em] text-slate-500 font-medium whitespace-nowrap">
                   Панель канала
                 </p>
                 {user && (
-                  <p className="text-[10px] text-slate-500 truncate">
-                    Вы вошли как <span className="text-slate-400 font-medium">{user.email}</span>
+                  <p className="text-[10px] text-slate-500 truncate min-w-0">
+                    Вы вошли как <span className="text-slate-400 font-medium truncate inline-block max-w-[200px]">{user.email}</span>
                   </p>
                 )}
               </div>
-              <h1 className="text-xl lg:text-2xl font-bold premium-title mb-1">
+              <h1 className="text-xl lg:text-2xl font-bold premium-title mb-1 break-words">
                 Ваши каналы ({channels.length})
               </h1>
-              <p className="text-xs text-slate-400 premium-subtitle leading-snug line-clamp-2">
+              <p className="text-xs text-slate-400 premium-subtitle leading-snug line-clamp-2 break-words">
                 Управляйте настройками, запускайте генерации сценариев и создавайте
                 новые каналы под разные соцсети.
               </p>
             </div>
 
-            {/* Правая часть: кнопки, переключатели, аватар */}
-            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end max-w-full">
+            {/* Правая часть: кнопки, переключатели, аватар - адаптивная с wrap на tablet */}
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end w-full lg:w-auto">
               {/* Группа основных кнопок - адаптивная с dropdown */}
-              <div className="flex items-center gap-1.5 flex-wrap max-w-full">
+              <div className="flex items-center gap-1.5 flex-wrap w-full lg:w-auto justify-end">
                 {/* Кнопка Создать - всегда видна */}
                 <button
                   type="button"
@@ -640,8 +640,8 @@ const ChannelListPage = () => {
                   <span className="hidden lg:inline">Создать</span>
                 </button>
                 
-                {/* Основные кнопки - видимые на десктопе */}
-                <div className="hidden lg:flex items-center gap-1.5 flex-wrap">
+                {/* Основные кнопки - видимые на десктопе (xl+), на tablet уходят в dropdown */}
+                <div className="hidden xl:flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
                     onClick={() => {
@@ -654,7 +654,7 @@ const ChannelListPage = () => {
                     title="Music Clips"
                   >
                     <Music size={14} className="lg:w-4 lg:h-4" />
-                    <span className="hidden xl:inline">Music Clips</span>
+                    <span>Music Clips</span>
                   </button>
                   <button
                     type="button"
@@ -663,7 +663,7 @@ const ChannelListPage = () => {
                     title="Расписание"
                   >
                     <Calendar size={14} className="lg:w-4 lg:h-4" />
-                    <span className="hidden xl:inline">Расписание</span>
+                    <span>Расписание</span>
                   </button>
                   <button
                     type="button"
@@ -672,23 +672,24 @@ const ChannelListPage = () => {
                     title="Генератор"
                   >
                     <Wand2 size={14} className="lg:w-4 lg:h-4" />
-                    <span className="hidden xl:inline">Генератор</span>
+                    <span>Генератор</span>
                   </button>
                 </div>
 
-                {/* Dropdown "Ещё" для узких экранов и дополнительных кнопок */}
+                {/* Dropdown "Ещё" для tablet и мобильных */}
                 <div className="relative" ref={moreMenuRef}>
                   <button
                     type="button"
                     onClick={() => setShowMoreMenu(!showMoreMenu)}
-                    className="premium-btn-secondary inline-flex items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-xs text-slate-200 lg:px-3 lg:py-2 lg:text-sm flex-shrink-0 lg:hidden"
+                    className="premium-btn-secondary inline-flex items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-xs text-slate-200 lg:px-3 lg:py-2 lg:text-sm flex-shrink-0 xl:hidden"
                     title="Ещё"
                   >
                     <MoreVertical size={14} className="lg:w-4 lg:h-4" />
+                    <span className="hidden md:inline">Ещё</span>
                   </button>
                   
-                  {/* Кнопки, которые всегда в dropdown на мобильных, но видны на десктопе */}
-                  <div className="hidden lg:flex items-center gap-1.5">
+                  {/* Кнопки Экспорт/Импорт - видимые на десктопе (xl+), на tablet уходят в dropdown */}
+                  <div className="hidden xl:flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={handleExport}
@@ -701,7 +702,7 @@ const ChannelListPage = () => {
                       ) : (
                         <Download size={14} className="lg:w-4 lg:h-4" />
                       )}
-                      <span className="hidden xl:inline">Экспорт</span>
+                      <span>Экспорт</span>
                     </button>
                     <button
                       type="button"
@@ -710,11 +711,11 @@ const ChannelListPage = () => {
                       title="Импорт каналов"
                     >
                       <Upload size={14} className="lg:w-4 lg:h-4" />
-                      <span className="hidden xl:inline">Импорт</span>
+                      <span>Импорт</span>
                     </button>
                   </div>
 
-                  {/* Dropdown меню для мобильных */}
+                  {/* Dropdown меню для tablet и мобильных */}
                   {showMoreMenu && (
                     <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-white/20 bg-slate-900/95 backdrop-blur-sm p-2 shadow-xl z-50">
                       <button
@@ -919,11 +920,20 @@ const ChannelListPage = () => {
 
         {/* Мобильная версия заголовка */}
         <div className="flex flex-col gap-3 md:hidden">
-          <div className="flex items-center justify-between rounded-2xl channels-premium-header p-4">
-            <h1 className="text-xl font-bold premium-title">
-              Ваши каналы ({channels.length})
-            </h1>
-            <div className="flex items-center gap-2">
+          <div className="flex items-start justify-between gap-3 rounded-2xl channels-premium-header p-4">
+            {/* Левая часть - заголовок с минимальной шириной */}
+            <div className="flex-1 min-w-[160px]">
+              <h1 className="text-xl font-bold premium-title break-words">
+                Ваши каналы ({channels.length})
+              </h1>
+              {user && (
+                <p className="text-[10px] text-slate-500 truncate mt-1">
+                  <span className="text-slate-400 font-medium truncate inline-block max-w-[180px]">{user.email}</span>
+                </p>
+              )}
+            </div>
+            {/* Правая часть - кнопка меню */}
+            <div className="flex items-center gap-2 flex-shrink-0">
               <div className="relative mobile-header-menu-container">
                 <button
                   ref={mobileMenuButtonRef}
