@@ -1098,6 +1098,45 @@ const ChannelEditPage = () => {
                 </div>
               </div>
             </Accordion>
+            ) : (
+              <Accordion
+                title="Основные настройки канала"
+                defaultOpen={!channelId}
+                summary={(() => {
+                  if (!channel?.musicClipsSettings) return "Настройки не заполнены";
+                  const parts: string[] = [];
+                  if (channel.musicClipsSettings.sunoPrompt) {
+                    const preview = channel.musicClipsSettings.sunoPrompt.substring(0, 50);
+                    parts.push(preview + (channel.musicClipsSettings.sunoPrompt.length > 50 ? "..." : ""));
+                  }
+                  if (channel.musicClipsSettings.styleTags && channel.musicClipsSettings.styleTags.length > 0) {
+                    parts.push(channel.musicClipsSettings.styleTags.join(", "));
+                  }
+                  return parts.join(" • ") || "Настройки не заполнены";
+                })()}
+                className="border-0 bg-transparent"
+              >
+                <ChannelBaseSettingsMusicClips
+                  settings={channel.musicClipsSettings || {
+                    targetDurationSec: 60,
+                    clipSec: 10,
+                    segmentDelayMs: 30000,
+                    maxParallelSegments: 1,
+                    maxRetries: 3,
+                    retryDelayMs: 60000,
+                    sunoPrompt: "",
+                    platforms: { youtube: true }
+                  }}
+                  onChange={(settings) => {
+                    setChannel({
+                      ...channel,
+                      musicClipsSettings: settings
+                    });
+                  }}
+                  channelName={channel.name}
+                />
+              </Accordion>
+            )}
 
             {/* Блок логики генерации сценариев / промптов */}
             <div className="border-t border-white/10 pt-6">
